@@ -6,6 +6,8 @@ from datetime import datetime
 from enum import Enum
 import boto3
 from langchain_community.embeddings import BedrockEmbeddings, OpenAIEmbeddings, HuggingFaceEmbeddings
+from typing import List
+from openai import OpenAI
 
 class EmbeddingProvider(str, Enum):
     """
@@ -14,6 +16,7 @@ class EmbeddingProvider(str, Enum):
     OPENAI = "openai"
     BEDROCK = "bedrock"
     HUGGINGFACE = "huggingface"
+    QWEN = "qwen"  # 新增Qwen支持
 
 class EmbeddingConfig:
     """
@@ -30,6 +33,27 @@ class EmbeddingConfig:
         self.provider = provider
         self.model_name = model_name
         self.aws_region = "ap-southeast-1"  # 可配置
+
+class QwenEmbeddings:
+    def __init__(self, model_name: str, api_key: str, dimensions: int = 1024):
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+        )
+        self.model_name = model_name
+        self.dimensions = dimensions
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        response = self.client.embeddings.create(
+            model=self.model_name,
+            input=texts,
+            dimensions=self.dimensions,
+            encoding_format="float"
+        )
+        return [embedding.embedding for embedding in response.data]
+
+    def embed_query(self, text: str) -> List[float]:
+        return self.embed_documents([text])[0]
 
 class EmbeddingService:
     """
@@ -56,15 +80,16 @@ class EmbeddingService:
         filename = input_data.get('metadata', {}).get('filename', '')  # 获取文件名
         
         # 批处理大小
-        BATCH_SIZE = 20
+        BATCH_SIZE = 10  # Qwen API 的硬性限制
         results = []
         
         # 如果是OpenAI，使用批处理
-        if config.provider == EmbeddingProvider.OPENAI:
+        if config.provider in [EmbeddingProvider.OPENAI, EmbeddingProvider.QWEN]:
             for i in range(0, len(chunks), BATCH_SIZE):
                 batch = chunks[i:i + BATCH_SIZE]
                 # 提取当前批次的文本内容
-                texts = [chunk.get("content", "") for chunk in batch]
+                # texts = [chunk.get("content", "") for chunk in batch]
+                texts = [str(chunk.get("content", "")) for chunk in batch]
                 
                 # 批量获取embeddings
                 embedding_vectors = embedding_function.embed_documents(texts)
@@ -275,6 +300,13 @@ class EmbeddingFactory:
         elif config.provider == EmbeddingProvider.HUGGINGFACE:
             return HuggingFaceEmbeddings(
                 model_name=config.model_name
+            )
+
+        elif config.provider == EmbeddingProvider.QWEN:
+            return QwenEmbeddings(
+                model_name=config.model_name,  # 使用官方模型名称
+                api_key=os.getenv("QWEN_API_KEY"),
+                dimensions=1024  # 根据需求调整维度
             )
             
         raise ValueError(f"Unsupported embedding provider: {config.provider}")
