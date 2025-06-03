@@ -45,8 +45,8 @@ const Indexing = () => {
 
   useEffect(() => {
     // 当数据库改变时，重置索引模式为该数据库的第一个可用模式
-    setIndexMode(dbConfigs[vectorDb].modes[0]);
-  }, [vectorDb]);
+    setIndexMode(dbConfigs[selectedProvider].modes[0]);
+  }, [selectedProvider]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,22 +104,22 @@ const Indexing = () => {
     setStatus('Indexing...');
     try {
       const response = await fetch(`${apiBaseUrl}/index`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           fileId: embeddingFile,
-          vectorDb,
-          indexMode
+          vectorDb: selectedProvider,
+          indexMode,
         }),
       });
-      
       const data = await response.json();
+      console.log("Indexing result:", data);
       setIndexingResult(data);
       setStatus('Indexing completed successfully');
     } catch (error) {
-      console.error('Error indexing:', error);
+      console.error("Indexing error:", error);
       setStatus('Error during indexing: ' + error.message);
     }
   };
@@ -204,7 +204,10 @@ const Indexing = () => {
               <label className="block text-sm font-medium mb-1">Vector Database</label>
               <select
                 value={selectedProvider}
-                onChange={(e) => setSelectedProvider(e.target.value)}
+                onChange={(e) => {
+                  setSelectedProvider(e.target.value);
+                  setVectorDb(e.target.value);
+                }}
                 className="block w-full p-2 border rounded"
               >
                 {providers.map(provider => (
@@ -223,7 +226,7 @@ const Indexing = () => {
                 onChange={(e) => setIndexMode(e.target.value)}
                 className="block w-full p-2 border rounded"
               >
-                {dbConfigs[vectorDb].modes.map(mode => (
+                {dbConfigs[selectedProvider].modes.map(mode => (
                   <option key={mode} value={mode}>
                     {mode.toUpperCase()}
                   </option>

@@ -1,0 +1,49 @@
+{
+  "query": "R1做了哪些提升",
+  "collection_id": "_10_qwen_20250603200610",
+  "timestamp": "2025-06-03T20:09:52.618473",
+  "results": [
+    {
+      "text": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via\nReinforcement Learning\nDeepSeek-AI\nresearch@deepseek.com\nAbstract\nWe introduce our first-generation reasoning models, DeepSeek-R1-Zero and DeepSeek-R1.\nDeepSeek-R1-Zero, a model trained via large-scale reinforcement learning (RL) without super-\nvised fine-tuning (SFT) as a preliminary step, demonstrates remarkable reasoning capabilities.\nThrough RL, DeepSeek-R1-Zero naturally emerges with numerous powerful and intriguing\nreasoning behaviors. However, it encounters challenges such as poor readability, and language\nmixing. To address these issues and further enhance reasoning performance, we introduce\nDeepSeek-R1, which incorporates multi-stage training and cold-start data before RL. DeepSeek-\nR1 achieves performance comparable to OpenAI-o1-1217 on reasoning tasks. To support the\nresearch community, we open-source DeepSeek-R1-Zero, DeepSeek-R1, and six dense models\n(1.5B, 7B, 8B, 14B, 32B, 70B) distilled from DeepSeek-R1 based on Qwen and Llama.\nAIME 2024\n(Pass@1)\nCodeforces\n(Percentile)\nGPQA Diamond\n(Pass@1)\nMATH-500\n(Pass@1)\nMMLU\n(Pass@1)\nSWE-bench Verified\n(Resolved)\n0\n20\n40\n60\n80\n100\nAccuracy / Percentile (%)\n79.8\n96.3\n71.5\n97.3\n90.8\n49.2\n79.2\n96.6\n75.7\n96.4\n91.8\n48.9\n72.6\n90.6\n62.1\n94.3\n87.4\n36.8\n63.6\n93.4\n60.0\n90.0\n85.2\n41.6\n39.2\n58.7\n59.1\n90.2\n88.5\n42.0\nDeepSeek-R1\nOpenAI-o1-1217\nDeepSeek-R1-32B\nOpenAI-o1-mini\nDeepSeek-V3\nFigure 1 | Benchmark performance of DeepSeek-R1.\narXiv:2501.12948v1  [cs.CL]  22 Jan 2025",
+      "score": 0.6066906452178955,
+      "metadata": {
+        "source": "10.pdf",
+        "page": "1",
+        "chunk": 1,
+        "total_chunks": 22,
+        "page_range": "1",
+        "embedding_provider": "qwen",
+        "embedding_model": "text-embedding-v3",
+        "embedding_timestamp": "2025-06-03T19:50:39.844328"
+      }
+    },
+    {
+      "text": "• Others: DeepSeek-R1 also excels in a wide range of tasks, including creative writing,\ngeneral question answering, editing, summarization, and more. It achieves an impressive\nlength-controlled win-rate of 87.6% on AlpacaEval 2.0 and a win-rate of 92.3% on Are-\nnaHard, showcasing its strong ability to intelligently handle non-exam-oriented queries.\nAdditionally, DeepSeek-R1 demonstrates outstanding performance on tasks requiring\nlong-context understanding, substantially outperforming DeepSeek-V3 on long-context\nbenchmarks.\n2. Approach\n2.1. Overview\nPrevious work has heavily relied on large amounts of supervised data to enhance model\nperformance. In this study, we demonstrate that reasoning capabilities can be significantly\nimproved through large-scale reinforcement learning (RL), even without using supervised\nfine-tuning (SFT) as a cold start. Furthermore, performance can be further enhanced with\nthe inclusion of a small amount of cold-start data. In the following sections, we present: (1)\nDeepSeek-R1-Zero, which applies RL directly to the base model without any SFT data, and\n(2) DeepSeek-R1, which applies RL starting from a checkpoint fine-tuned with thousands of\nlong Chain-of-Thought (CoT) examples. 3) Distill the reasoning capability from DeepSeek-R1 to\nsmall dense models.\n2.2. DeepSeek-R1-Zero: Reinforcement Learning on the Base Model\nReinforcement learning has demonstrated significant effectiveness in reasoning tasks, as ev-\nidenced by our previous works (Shao et al., 2024; Wang et al., 2023). However, these works\nheavily depended on supervised data, which are time-intensive to gather. In this section, we\nexplore the potential of LLMs to develop reasoning capabilities without any supervised data,\nfocusing on their self-evolution through a pure reinforcement learning process. We start with a\nbrief overview of our RL algorithm, followed by the presentation of some exciting results, and\nhope this provides the community with valuable insights.\n2.2.1. Reinforcement Learning Algorithm\nGroup Relative Policy Optimization\nIn order to save the training costs of RL, we adopt Group\nRelative Policy Optimization (GRPO) (Shao et al., 2024), which foregoes the critic model that is\ntypically the same size as the policy model, and estimates the baseline from group scores instead.\nSpecifically, for each question 𝑞, GRPO samples a group of outputs {𝑜1, 𝑜2, · · · , 𝑜𝐺} from the old\npolicy 𝜋𝜃𝑜𝑙𝑑and then optimizes the policy model 𝜋𝜃by maximizing the following objective:\nJ𝐺𝑅𝑃𝑂(𝜃) = E[𝑞∼𝑃(𝑄), {𝑜𝑖}𝐺\n𝑖=1 ∼𝜋𝜃𝑜𝑙𝑑(𝑂|𝑞)]\n1\n𝐺\n𝐺\n∑︁\n𝑖=1\n\u0012\nmin\n\u0012 𝜋𝜃(𝑜𝑖|𝑞)\n𝜋𝜃𝑜𝑙𝑑(𝑜𝑖|𝑞) 𝐴𝑖, clip\n\u0012 𝜋𝜃(𝑜𝑖|𝑞)\n𝜋𝜃𝑜𝑙𝑑(𝑜𝑖|𝑞) , 1 −𝜀, 1 + 𝜀\n\u0013\n𝐴𝑖\n\u0013\n−𝛽D𝐾𝐿\n\u0000𝜋𝜃||𝜋𝑟𝑒𝑓\n\u0001\u0013\n,\n(1)\nD𝐾𝐿\n\u0000𝜋𝜃||𝜋𝑟𝑒𝑓\n\u0001 =\n𝜋𝑟𝑒𝑓(𝑜𝑖|𝑞)\n𝜋𝜃(𝑜𝑖|𝑞) −log\n𝜋𝑟𝑒𝑓(𝑜𝑖|𝑞)\n𝜋𝜃(𝑜𝑖|𝑞) −1,\n(2)\nwhere 𝜀and 𝛽are hyper-parameters, and 𝐴𝑖is the advantage, computed using a group of\nrewards {𝑟1, 𝑟2, . . . , 𝑟𝐺} corresponding to the outputs within each group:\n𝐴𝑖= 𝑟𝑖−m𝑒𝑎𝑛({𝑟1, 𝑟2, · · · , 𝑟𝐺})\ns𝑡𝑑({𝑟1, 𝑟2, · · · , 𝑟𝐺})\n.\n(3)\n5",
+      "score": 0.6050975918769836,
+      "metadata": {
+        "source": "10.pdf",
+        "page": "5",
+        "chunk": 5,
+        "total_chunks": 22,
+        "page_range": "5",
+        "embedding_provider": "qwen",
+        "embedding_model": "text-embedding-v3",
+        "embedding_timestamp": "2025-06-03T19:50:39.844362"
+      }
+    },
+    {
+      "text": "1.1. Contributions\nPost-Training: Large-Scale Reinforcement Learning on the Base Model\n• We directly apply RL to the base model without relying on supervised fine-tuning (SFT) as\na preliminary step. This approach allows the model to explore chain-of-thought (CoT) for\nsolving complex problems, resulting in the development of DeepSeek-R1-Zero. DeepSeek-\nR1-Zero demonstrates capabilities such as self-verification, reflection, and generating\nlong CoTs, marking a significant milestone for the research community. Notably, it is the\nfirst open research to validate that reasoning capabilities of LLMs can be incentivized\npurely through RL, without the need for SFT. This breakthrough paves the way for future\nadvancements in this area.\n• We introduce our pipeline to develop DeepSeek-R1. The pipeline incorporates two RL\nstages aimed at discovering improved reasoning patterns and aligning with human pref-\nerences, as well as two SFT stages that serve as the seed for the model’s reasoning and\nnon-reasoning capabilities. We believe the pipeline will benefit the industry by creating\nbetter models.\nDistillation: Smaller Models Can Be Powerful Too\n• We demonstrate that the reasoning patterns of larger models can be distilled into smaller\nmodels, resulting in better performance compared to the reasoning patterns discovered\nthrough RL on small models. The open source DeepSeek-R1, as well as its API, will benefit\nthe research community to distill better smaller models in the future.\n• Using the reasoning data generated by DeepSeek-R1, we fine-tuned several dense models\nthat are widely used in the research community. The evaluation results demonstrate that\nthe distilled smaller dense models perform exceptionally well on benchmarks. DeepSeek-\nR1-Distill-Qwen-7B achieves 55.5% on AIME 2024, surpassing QwQ-32B-Preview. Addi-\ntionally, DeepSeek-R1-Distill-Qwen-32B scores 72.6% on AIME 2024, 94.3% on MATH-500,\nand 57.2% on LiveCodeBench. These results significantly outperform previous open-\nsource models and are comparable to o1-mini. We open-source distilled 1.5B, 7B, 8B, 14B,\n32B, and 70B checkpoints based on Qwen2.5 and Llama3 series to the community.\n1.2. Summary of Evaluation Results\n• Reasoning tasks: (1) DeepSeek-R1 achieves a score of 79.8% Pass@1 on AIME 2024, slightly\nsurpassing OpenAI-o1-1217. On MATH-500, it attains an impressive score of 97.3%,\nperforming on par with OpenAI-o1-1217 and significantly outperforming other models. (2)\nOn coding-related tasks, DeepSeek-R1 demonstrates expert level in code competition tasks,\nas it achieves 2,029 Elo rating on Codeforces outperforming 96.3% human participants in\nthe competition. For engineering-related tasks, DeepSeek-R1 performs slightly better than\nDeepSeek-V3, which could help developers in real world tasks.\n• Knowledge: On benchmarks such as MMLU, MMLU-Pro, and GPQA Diamond, DeepSeek-\nR1 achieves outstanding results, significantly outperforming DeepSeek-V3 with scores\nof 90.8% on MMLU, 84.0% on MMLU-Pro, and 71.5% on GPQA Diamond. While its\nperformance is slightly below that of OpenAI-o1-1217 on these benchmarks, DeepSeek-R1\nsurpasses other closed-source models, demonstrating its competitive edge in educational\ntasks. On the factual benchmark SimpleQA, DeepSeek-R1 outperforms DeepSeek-V3,\ndemonstrating its capability in handling fact-based queries. A similar trend is observed\nwhere OpenAI-o1 surpasses 4o on this benchmark.\n4",
+      "score": 0.5941929221153259,
+      "metadata": {
+        "source": "10.pdf",
+        "page": "4",
+        "chunk": 4,
+        "total_chunks": 22,
+        "page_range": "4",
+        "embedding_provider": "qwen",
+        "embedding_model": "text-embedding-v3",
+        "embedding_timestamp": "2025-06-03T19:50:39.844360"
+      }
+    }
+  ]
+}

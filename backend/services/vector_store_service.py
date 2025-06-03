@@ -7,6 +7,9 @@ from pathlib import Path
 from pymilvus import connections, utility
 from pymilvus import Collection, DataType, FieldSchema, CollectionSchema
 from utils.config import VectorDBProvider, MILVUS_CONFIG  # Updated import
+import chromadb  # 新增 ChromaDB 依赖
+from chromadb.config import Settings
+from chromadb import PersistentClient  # 使用新版客户端
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +64,8 @@ class VectorStoreService:
         self.initialized_dbs = {}
         # 确保存储目录存在
         os.makedirs("03-vector-store", exist_ok=True)
+        # 初始化 Chroma 客户端
+        self.chroma_client = PersistentClient(path="../../../ollama_deploy/chroma_docker/chroma-data")  # 指定持久化路径
     
     def _get_milvus_index_type(self, config: VectorDBConfig) -> str:
         """
@@ -105,6 +110,10 @@ class VectorStoreService:
         # 根据不同的数据库进行索引
         if config.provider == VectorDBProvider.MILVUS:
             result = self._index_to_milvus(embeddings_data, config)
+        elif config.provider == VectorDBProvider.CHROMA:
+            result = self._index_to_chroma(embeddings_data, config)
+        else:
+            raise ValueError(f"Unsupported vector database provider: {config.provider}")
         
         end_time = datetime.now()
         processing_time = (end_time - start_time).total_seconds()
@@ -284,6 +293,52 @@ class VectorStoreService:
         finally:
             connections.disconnect("default")
 
+    def _index_to_chroma(self, embeddings_data: Dict[str, Any], config: VectorDBConfig) -> Dict[str, Any]:
+        """将嵌入向量索引到 ChromaDB"""
+        try:
+            collection_name = f"{embeddings_data.get('filename', 'doc')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
+            # 从原始数据中提取Embedding配置（或使用默认值）
+            embedding_provider = embeddings_data.get("embedding_provider", "huggingface")  # 默认本地模型
+            embedding_model = embeddings_data.get("embedding_model", "all-MiniLM-L6-v2")   # 默认本地模型
+
+            # 创建集合时写入元数据
+            collection = self.chroma_client.get_or_create_collection(
+                name=collection_name,
+                metadata={
+                    "embedding_provider": embedding_provider,
+                    "embedding_model": embedding_model,
+                    "indexed_at": datetime.now().isoformat()
+                }
+            )
+
+            # 准备数据
+            ids = [str(i) for i in range(len(embeddings_data["embeddings"]))]
+            embeddings = [emb["embedding"] for emb in embeddings_data["embeddings"]]
+            metadatas = [
+                {
+                    "chunk_id": emb["metadata"].get("chunk_id", 0),
+                    "page_number": emb["metadata"].get("page_number", 0),
+                    "content": emb["metadata"].get("content", "")  # 可选：存储原始文本
+                }
+                for emb in embeddings_data["embeddings"]
+            ]
+
+            # 添加到集合
+            collection.add(
+                ids=ids,
+                embeddings=embeddings,
+                metadatas=metadatas
+            )
+
+            return {
+                "index_size": len(embeddings),
+                "collection_name": collection_name
+            }
+        except Exception as e:
+            logger.error(f"Chroma索引失败: {str(e)}")
+            raise
+
     def list_collections(self, provider: str) -> List[str]:
         """
         列出指定提供商的所有集合
@@ -294,11 +349,12 @@ class VectorStoreService:
         返回:
             集合名称列表
         """
-        if provider == VectorDBProvider.MILVUS:
+        if provider == VectorDBProvider.CHROMA:
+            return [col.name for col in self.chroma_client.list_collections()]
+        elif provider == VectorDBProvider.MILVUS:
             try:
                 connections.connect(alias="default", uri=MILVUS_CONFIG["uri"])
-                collections = utility.list_collections()
-                return collections
+                return utility.list_collections()
             finally:
                 connections.disconnect("default")
         return []
@@ -314,7 +370,14 @@ class VectorStoreService:
         返回:
             是否删除成功
         """
-        if provider == VectorDBProvider.MILVUS:
+        if provider == VectorDBProvider.CHROMA:
+            try:
+                self.chroma_client.delete_collection(collection_name)
+                return True
+            except Exception as e:
+                logger.error(f"删除 Chroma 集合失败: {str(e)}")
+                return False
+        elif provider == VectorDBProvider.MILVUS:
             try:
                 connections.connect(alias="default", uri=MILVUS_CONFIG["uri"])
                 utility.drop_collection(collection_name)
@@ -334,7 +397,17 @@ class VectorStoreService:
         返回:
             集合信息字典
         """
-        if provider == VectorDBProvider.MILVUS:
+        if provider == VectorDBProvider.CHROMA:
+            try:
+                collection = self.chroma_client.get_collection(collection_name)
+                return {
+                    "name": collection_name,
+                    "num_entities": collection.count(),
+                }
+            except Exception as e:
+                logger.error(f"获取 Chroma 集合信息失败: {str(e)}")
+                return {}
+        elif provider == VectorDBProvider.MILVUS:
             try:
                 connections.connect(alias="default", uri=MILVUS_CONFIG["uri"])
                 collection = Collection(collection_name)

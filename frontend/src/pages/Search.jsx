@@ -50,6 +50,7 @@ const Search = () => {
       const searchParams = {
         query,
         collection_id: collection,
+        provider: selectedProvider,
         top_k: topK,
         threshold,
         word_count_threshold: wordCountThreshold,

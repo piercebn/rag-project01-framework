@@ -309,4 +309,4 @@ class EmbeddingFactory:
                 dimensions=1024  # 根据需求调整维度
             )
             
-        raise ValueError(f"Unsupported embedding provider: {config.provider}")
+        raise ValueError(f"不支持的Embedding提供方: {config.provider}")

@@ -3,6 +3,7 @@ from typing import Dict, Any
 
 class VectorDBProvider(str, Enum):
     MILVUS = "milvus"
+    CHROMA = "chroma"  # 新增 Chroma 支持
     # More providers can be added later
 
 # 可以在这里添加其他配置相关的内容
@@ -22,5 +23,21 @@ MILVUS_CONFIG = {
             "M": 16,
             "efConstruction": 500
         }
+    }
+}
+
+# Chroma 的配置
+CHROMA_CONFIG = {
+    "uri": "http://localhost:8000",  # Chroma 服务器的地址
+    "index_types": {
+        "hnsw": "HNSW",  # 支持 HNSW 索引
+        "standard": "STANDARD"  # 支持标准索引
+    },
+    "index_params": {
+        "hnsw": {
+            "M": 16,  # HNSW 参数
+            "efConstruction": 200
+        },
+        "standard": {}  # 标准索引无额外参数
     }
 } 

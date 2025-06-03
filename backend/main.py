@@ -298,6 +298,7 @@ async def get_collections(
 @app.post("/search")
 async def search(
     query: str = Body(...),
+    provider: str = Body(...),
     collection_id: str = Body(...),
     top_k: int = Body(3),
     threshold: float = Body(0.7),
@@ -315,6 +316,7 @@ async def search(
         
         results = await search_service.search(
             query=query,
+            provider=provider,
             collection_id=collection_id,
             top_k=top_k,
             threshold=threshold,
