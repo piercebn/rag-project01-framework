@@ -29,9 +29,9 @@ class SearchService:
         self.search_results_dir = "04-search-results"
         os.makedirs(self.search_results_dir, exist_ok=True)
         
-        # 初始化 Chroma 客户端（新版方式）
+        # 初始化 Chroma 客户端，使用 CHROMA_CONFIG 中的 uri
         try:
-            self.chroma_client = PersistentClient(path="../../../ollama_deploy/chroma_docker/chroma-data")
+            self.chroma_client = PersistentClient(path=CHROMA_CONFIG["uri"])
             logger.info("Chroma client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Chroma: {e}")

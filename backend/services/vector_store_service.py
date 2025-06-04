@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from pymilvus import connections, utility
 from pymilvus import Collection, DataType, FieldSchema, CollectionSchema
-from utils.config import VectorDBProvider, MILVUS_CONFIG  # Updated import
+from utils.config import VectorDBProvider, MILVUS_CONFIG, CHROMA_CONFIG  # Updated import
 import chromadb  # 新增 ChromaDB 依赖
 from chromadb.config import Settings
 from chromadb import PersistentClient  # 使用新版客户端
@@ -64,8 +64,8 @@ class VectorStoreService:
         self.initialized_dbs = {}
         # 确保存储目录存在
         os.makedirs("03-vector-store", exist_ok=True)
-        # 初始化 Chroma 客户端
-        self.chroma_client = PersistentClient(path="../../../ollama_deploy/chroma_docker/chroma-data")  # 指定持久化路径
+        # 初始化 Chroma 客户端，使用 CHROMA_CONFIG 中的 uri
+        self.chroma_client = PersistentClient(path=CHROMA_CONFIG["uri"])
     
     def _get_milvus_index_type(self, config: VectorDBConfig) -> str:
         """

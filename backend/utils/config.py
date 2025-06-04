@@ -28,7 +28,7 @@ MILVUS_CONFIG = {
 
 # Chroma 的配置
 CHROMA_CONFIG = {
-    "uri": "http://localhost:8000",  # Chroma 服务器的地址
+    "uri": "03-vector-store/chroma-data",  # 更新为本地路径
     "index_types": {
         "hnsw": "HNSW",  # 支持 HNSW 索引
         "standard": "STANDARD"  # 支持标准索引
