@@ -296,6 +296,7 @@ class VectorStoreService:
     def _index_to_chroma(self, embeddings_data: Dict[str, Any], config: VectorDBConfig) -> Dict[str, Any]:
         """将嵌入向量索引到 ChromaDB"""
         try:
+            # 生成唯一集合名称（格式：文件名_时间戳）
             collection_name = f"{embeddings_data.get('filename', 'doc')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
             # 从原始数据中提取Embedding配置（或使用默认值）
