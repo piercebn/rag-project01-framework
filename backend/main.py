@@ -423,6 +423,28 @@ async def get_documents(type: str = Query("all")):
                                 "name": filename,  # 保持原始文件名
                                 "type": "chunked"
                             })
+
+        # 新增：读取parsed文档
+        if type in ["all", "parsed"]:
+            parsed_dir = "01-parsed-docs"
+            if os.path.exists(parsed_dir):
+                for filename in os.listdir(parsed_dir):
+                    if filename.endswith('.json'):
+                        file_path = os.path.join(parsed_dir, filename)
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            doc_data = json.load(f)
+                            documents.append({
+                                "id": filename,
+                                "name": filename,
+                                "type": "parsed",
+                                "metadata": {
+                                    "total_pages": doc_data.get("total_pages"),
+                                    "total_chunks": doc_data.get("total_chunks"),
+                                    "loading_method": doc_data.get("loading_method"),
+                                    "parsing_method": doc_data.get("parsing_method"),
+                                    "timestamp": doc_data.get("timestamp")
+                                }
+                            })
         
         return {"documents": documents}
     except Exception as e:
@@ -432,12 +454,19 @@ async def get_documents(type: str = Query("all")):
 @app.get("/documents/{doc_name}")
 async def get_document(doc_name: str, type: str = Query("loaded")):
     try:
-
         base_name = doc_name.replace('.json', '')
         file_name = f"{base_name}.json"
         
         # 根据类型选择不同的目录
-        directory = "01-loaded-docs" if type == "loaded" else "01-chunked-docs"
+        if type == "loaded":
+            directory = "01-loaded-docs"
+        elif type == "chunked":
+            directory = "01-chunked-docs"
+        elif type == "parsed":
+            directory = "01-parsed-docs"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid document type")
+        
         file_path = os.path.join(directory, file_name)
         
         logger.info(f"Attempting to read document from: {file_path}")
@@ -464,7 +493,15 @@ async def delete_document(doc_name: str, type: str = Query("loaded")):
         file_name = f"{base_name}.json"
         
         # 根据类型选择不同的目录
-        directory = "01-loaded-docs" if type == "loaded" else "01-chunked-docs"
+        if type == "loaded":
+            directory = "01-loaded-docs"
+        elif type == "chunked":
+            directory = "01-chunked-docs"
+        elif type == "parsed":
+            directory = "01-parsed-docs"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid document type")
+        
         file_path = os.path.join(directory, file_name)
         
         logger.info(f"Attempting to delete document: {file_path}")
@@ -583,11 +620,56 @@ async def parse_file(
             metadata,
             page_map=page_map
         )
+
+        # 构建标准化的chunks格式
+        chunks = []
+        for idx, item in enumerate(parsed_content["content"], 1):
+            chunk_metadata = {
+                "chunk_id": idx,
+                "page_number": item.get("page", 1),
+                "content_type": item.get("type", "text"),
+                "word_count": len(item["content"].split()) if item["content"] else 0
+            }
+            if "metadata" in item:
+                chunk_metadata.update(item["metadata"])
+            
+            chunks.append({
+                "content": item["content"],
+                "metadata": chunk_metadata
+            })
+
+        # 构建要保存的文档数据
+        document_data = {
+            "filename": file.filename,
+            "total_pages": metadata["total_pages"],
+            "total_chunks": len(chunks),  # 添加total_chunks
+            "loading_method": loading_method,
+            "parsing_method": parsing_option,
+            "timestamp": datetime.now().isoformat(),
+            "chunks": chunks,  # 标准化后的chunks
+            "metadata": parsed_content["metadata"]  # 原始元数据
+        }
+
+        # 保存解析结果
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        base_name = file.filename.replace('.pdf', '').split('_')[0]
+        doc_name = f"{base_name}_{loading_method}_{parsing_option}_{timestamp}"
         
-        # Clean up temp file
+        # 创建解析结果目录
+        os.makedirs("01-parsed-docs", exist_ok=True)
+        filepath = os.path.join("01-parsed-docs", f"{doc_name}.json")
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(document_data, f, ensure_ascii=False, indent=2)
+        
+        # 清理临时文件
         os.remove(temp_path)
         
-        return {"parsed_content": parsed_content}
+        return {
+            "parsed_content": document_data,  # 返回标准化后的数据
+            "saved_path": filepath
+        }
+        
     except Exception as e:
         logger.error(f"Error parsing file: {str(e)}")
         raise
