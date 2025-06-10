@@ -598,7 +598,8 @@ async def load_file(
     loading_method: str = Form(...),
     strategy: str = Form(None),
     chunking_strategy: str = Form(None),
-    chunking_options: str = Form(None)
+    chunking_options: str = Form(None),
+    llama_parse_params: str = Form(None)
 ):
     try:
         # 保存上传的文件
@@ -613,24 +614,24 @@ async def load_file(
             "total_chunks": 0,  # 将在后面更新
             "total_pages": 0,   # 将在后面更新
             "loading_method": loading_method,
-            "loading_strategy": strategy,  
-            "chunking_strategy": chunking_strategy, 
+            "loading_strategy": strategy,
+            "chunking_strategy": chunking_strategy,
             "timestamp": datetime.now().isoformat()
         }
-        
-        # Parse chunking options if provided
-        chunking_options_dict = None
-        if chunking_options:
-            chunking_options_dict = json.loads(chunking_options)
-        
+
+        # 解析参数
+        chunking_options_dict = json.loads(chunking_options) if chunking_options else None
+        llama_parse_params_dict = json.loads(llama_parse_params) if llama_parse_params else None
+
         # 使用 LoadingService 加载文档
         loading_service = LoadingService()
         raw_text = loading_service.load_pdf(
-            temp_path, 
-            loading_method, 
+            temp_path,
+            loading_method,
             strategy=strategy,
             chunking_strategy=chunking_strategy,
-            chunking_options=chunking_options_dict
+            chunking_options=chunking_options_dict,
+            llama_parse_params=llama_parse_params_dict
         )
         
         metadata["total_pages"] = loading_service.get_total_pages()

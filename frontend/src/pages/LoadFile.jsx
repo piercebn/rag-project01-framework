@@ -21,6 +21,11 @@ const LoadFile = () => {
   const [documents, setDocuments] = useState([]);
   const [activeTab, setActiveTab] = useState('preview'); // 'preview' 或 'documents'
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [llamaParseParams, setLlamaParseParams] = useState({
+    result_type: "markdown",
+    bounding_box: "",
+    preserve_layout_alignment_across_pages: true
+  });
 
   useEffect(() => {
     fetchDocuments();
@@ -54,6 +59,8 @@ const LoadFile = () => {
         formData.append('strategy', unstructuredStrategy);
         formData.append('chunking_strategy', chunkingStrategy);
         formData.append('chunking_options', JSON.stringify(chunkingOptions));
+      } else if (loadingMethod === 'llamaparse') {
+        formData.append('llama_parse_params', JSON.stringify(llamaParseParams));
       }
 
       const response = await fetch(`${apiBaseUrl}/load`, {
@@ -254,7 +261,9 @@ const LoadFile = () => {
               >
                 <option value="pymupdf">PyMuPDF</option>
                 <option value="pypdf">PyPDF</option>
+                <option value="pdfplumber">PDFPlumber</option>
                 <option value="unstructured">Unstructured</option>
+                <option value="llamaparse">LlamaParse</option>
               </select>
             </div>
 
@@ -379,6 +388,52 @@ const LoadFile = () => {
                   </div>
                 )}
               </>
+            )}
+
+            {loadingMethod === 'llamaparse' && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Result Type</label>
+                  <select
+                    value={llamaParseParams.result_type}
+                    onChange={(e) => setLlamaParseParams(prev => ({
+                      ...prev,
+                      result_type: e.target.value
+                    }))}
+                    className="block w-full p-2 border rounded"
+                  >
+                    <option value="text">Text</option>
+                    <option value="markdown">Markdown</option>
+                    <option value="json">JSON</option>
+                    <option value="structured">Structured</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Bounding Box</label>
+                  <input
+                    type="text"
+                    value={llamaParseParams.bounding_box}
+                    onChange={(e) => setLlamaParseParams(prev => ({
+                      ...prev,
+                      bounding_box: e.target.value
+                    }))}
+                    placeholder="0.02,0,0.05,0 (留空则不设置)"
+                    className="block w-full p-2 border rounded"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={llamaParseParams.preserve_layout_alignment_across_pages}
+                    onChange={(e) => setLlamaParseParams(prev => ({
+                      ...prev,
+                      preserve_layout_alignment_across_pages: e.target.checked
+                    }))}
+                    className="mr-2"
+                  />
+                  <label className="text-sm font-medium">Preserve Layout Alignment</label>
+                </div>
+              </div>
             )}
 
             <button 

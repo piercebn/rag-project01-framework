@@ -37,16 +37,19 @@ class LoadingService:
         self.total_pages = 0
         self.current_page_map = []
     
-    def load_pdf(self, file_path: str, method: str, strategy: str = None, chunking_strategy: str = None, chunking_options: dict = None) -> str:
+    def load_pdf(self, file_path: str, method: str, strategy: str = None, 
+                 chunking_strategy: str = None, chunking_options: dict = None,
+                 llama_parse_params: dict = None) -> str:
         """
         加载PDF文档的主方法，支持多种加载策略。
 
         参数:
             file_path (str): PDF文件路径
-            method (str): 加载方法，支持 'pymupdf', 'pypdf', 'pdfplumber', 'unstructured'
-            strategy (str, optional): 使用unstructured方法时的策略，可选 'fast', 'hi_res', 'ocr_only'
-            chunking_strategy (str, optional): 文本分块策略，可选 'basic', 'by_title'
+            method (str): 加载方法，支持 'pymupdf', 'pypdf', 'pdfplumber', 'unstructured', 'llamaparse'
+            strategy (str, optional): 使用unstructured方法时的策略
+            chunking_strategy (str, optional): 文本分块策略
             chunking_options (dict, optional): 分块选项配置
+            llama_parse_params (dict, optional): LlamaParse专用参数
 
         返回:
             str: 提取的文本内容
@@ -65,6 +68,8 @@ class LoadingService:
                     chunking_strategy=chunking_strategy,
                     chunking_options=chunking_options
                 )
+            elif method == "llamaparse":
+                return self._load_with_llamaparse(file_path, llama_parse_params)
             else:
                 raise ValueError(f"Unsupported loading method: {method}")
         except Exception as e:
@@ -264,6 +269,65 @@ class LoadingService:
             return "\n".join(block["text"] for block in text_blocks)
         except Exception as e:
             logger.error(f"pdfplumber error: {str(e)}")
+            raise
+    
+    def _load_with_llamaparse(self, file_path: str, llama_parse_params: dict = None) -> str:
+        """
+        使用LlamaParse库加载PDF文档。
+
+        参数:
+            file_path (str): PDF文件路径
+            llama_parse_params (dict, optional): LlamaParse配置参数
+
+        返回:
+            str: 提取的文本内容
+        """
+        try:
+            from llama_parse import LlamaParse
+            import os
+
+            # 检查API Key是否存在
+            api_key = os.getenv("LLAMA_PARSE_API_KEY")
+            if not api_key:
+                raise ValueError("未找到环境变量 LLAMA_PARSE_API_KEY")
+
+            # 默认参数
+            default_params = {
+                "result_type": "markdown",
+                "preserve_layout_alignment_across_pages": True
+            }
+
+            # 合并用户自定义参数
+            if llama_parse_params:
+                default_params.update({
+                    k: v for k, v in llama_parse_params.items()
+                    if v is not None and v != ""  # 过滤空值
+                })
+
+            # 初始化LlamaParse并加载PDF
+            documents = LlamaParse(
+                api_key=api_key,
+                **default_params
+            ).load_data(file_path)
+
+            # 提取文本内容并构建分块
+            text_blocks = []
+            for doc in documents:
+                text_blocks.append({
+                    "text": doc.text,
+                    "page": doc.metadata.get("page_number", 1)  # 默认页码为1
+                })
+
+            # 更新页面映射和总页数
+            self.current_page_map = text_blocks
+            self.total_pages = len(text_blocks) if text_blocks else 1
+            return "\n".join(block["text"] for block in text_blocks)
+
+        except ImportError:
+            logger.error("未安装LlamaParse库，请运行 `pip install llama-parse`")
+            raise
+        except Exception as e:
+            logger.error(f"LlamaParse解析出错: {str(e)}")
             raise
     
     def save_document(self, filename: str, chunks: list, metadata: dict, loading_method: str, strategy: str = None, chunking_strategy: str = None) -> str:
